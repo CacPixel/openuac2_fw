@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "usbd_def.h"
+#include "ak4490r.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,7 +47,7 @@
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN PFP */
-extern void USBD_AUDIO_Sync(USBD_HandleTypeDef *pdev);
+extern void USBD_AUDIO_Sync(USBD_HandleTypeDef* pdev);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -77,9 +78,9 @@ void NMI_Handler(void)
 
   /* USER CODE END NonMaskableInt_IRQn 0 */
   /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
-  while (1)
-  {
-  }
+    while (1)
+    {
+    }
   /* USER CODE END NonMaskableInt_IRQn 1 */
 }
 
@@ -204,12 +205,28 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
+  * @brief This function handles PVD interrupt through EXTI line 16.
+  */
+void PVD_IRQHandler(void)
+{
+  /* USER CODE BEGIN PVD_IRQn 0 */
+    AK4490R_SaveConfigToEEPROM();
+    printf("System Powerdown!\r\n");
+    while (1);
+
+  /* USER CODE END PVD_IRQn 0 */
+  /* USER CODE BEGIN PVD_IRQn 1 */
+
+  /* USER CODE END PVD_IRQn 1 */
+}
+
+/**
   * @brief This function handles DMA1 stream5 global interrupt.
   */
 void DMA1_Stream5_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Stream5_IRQn 0 */
-
+    
   /* USER CODE END DMA1_Stream5_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_spi3_tx);
   /* USER CODE BEGIN DMA1_Stream5_IRQn 1 */
@@ -223,10 +240,10 @@ void DMA1_Stream5_IRQHandler(void)
 void TIM3_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM3_IRQn 0 */
-	LL_TIM_ClearFlag_UPDATE(TIM3);
+    LL_TIM_ClearFlag_UPDATE(TIM3);
   /* USER CODE END TIM3_IRQn 0 */
   /* USER CODE BEGIN TIM3_IRQn 1 */
-	USBD_AUDIO_Sync(&hUsbDeviceHS);
+    USBD_AUDIO_Sync(&hUsbDeviceHS);
   /* USER CODE END TIM3_IRQn 1 */
 }
 

@@ -1,5 +1,7 @@
 #include "audio_buffer.h"
 #include "usbd_audio.h"
+#include "main.h"
+#include "ak4490r.h"
 
 #define USE_DMA_COPY
 
@@ -10,8 +12,11 @@ extern DMA_HandleTypeDef DMA_COPY_HANDLE;
 extern DMA_HandleTypeDef DMA_FILL_HANDLE;
 #endif
 
-__attribute__ ((aligned (4))) static uint8_t s_AudBufMem[AUDIO_BUF_SIZE];
-static AudioBuffer instance;
+__attribute__((aligned(4))) static uint8_t s_AudBufMem[AUDIO_BUF_SIZE + 1024];
+uint8_t s_BufZeros[6400] = { 0 };
+
+AudioBuffer ab_instance;
+AudioBuffer ab_empty;
 
 static void MemCopy(uint32_t* pDst, uint32_t* pSrc, uint32_t count)
 {
@@ -24,7 +29,7 @@ static void MemCopy(uint32_t* pDst, uint32_t* pSrc, uint32_t count)
 }
 
 // TODO: Use another stream
-static void MemFill(uint32_t *pDst, uint32_t val, uint32_t count)
+static void MemFill(uint32_t* pDst, uint32_t val, uint32_t count)
 {
 #ifdef USE_DMA_COPY
 	static uint32_t x;
@@ -38,7 +43,7 @@ static void MemFill(uint32_t *pDst, uint32_t val, uint32_t count)
 
 AudioBuffer* AudioBuffer_Instance()
 {
-	return &instance;
+	return &ab_instance;
 }
 
 void AudioBuffer_Reset(AudioBuffer* ab, uint32_t capacity)
@@ -52,7 +57,12 @@ void AudioBuffer_Reset(AudioBuffer* ab, uint32_t capacity)
 
 void AudioBuffer_Init(AudioBuffer* ab, uint32_t capacity)
 {
-	ab->mem = s_AudBufMem;
+	AudioBuffer_Init_WithBuf(ab, capacity, s_AudBufMem);
+}
+
+void AudioBuffer_Init_WithBuf(AudioBuffer* ab, uint32_t capacity, void* buf)
+{
+	ab->mem = buf;
 	AudioBuffer_Reset(ab, capacity);
 }
 
@@ -79,13 +89,20 @@ void AudioBuffer_Recieve(AudioBuffer* ab, uint32_t rxSize)
 		ab->size = ab->capacity;
 		ab->state = AB_OVFL;
 	}
+	// printf("AudioBuffer_Recieve: \tab->capacity = %d, ab->size = %d, ab->wr_ptr = %d, ab->rd_ptr = %d, ab->state = %s\r\n",
+	// ab->capacity,
+	// ab->size,
+	// ab->wr_ptr,
+	// ab->rd_ptr,
+	// ab->state == AB_OK ? "AB_OK" : ab->state == AB_OVFL ? "AB_OVFL" : "AB_UDFL");
+
 }
 
 void AudioBuffer_Sync(AudioBuffer* ab, uint32_t txSize)
 {
 	if (ab->size >= txSize)
 	{
-		MemFill((uint32_t*)&ab->mem[ab->rd_ptr], 0, txSize >> 2);
+		// MemFill((uint32_t*)&ab->mem[ab->rd_ptr], 0, txSize >> 2);
 		ab->size -= txSize;
 		ab->rd_ptr += txSize;
 
@@ -101,9 +118,30 @@ void AudioBuffer_Sync(AudioBuffer* ab, uint32_t txSize)
 		ab->size = 0;
 		ab->state = AB_UDFL;
 	}
+
+
+	// while ((USART1->SR & 0x40) == 0) { ; }
+	// USART1->DR = (ab->size % 1000) / 100 + '0';
+	// while ((USART1->SR & 0x40) == 0) { ; }
+	// USART1->DR = (ab->size % 100) / 10 + '0';
+	// while ((USART1->SR & 0x40) == 0) { ; }
+	// USART1->DR = (ab->size % 10) / 1 + '0';
+	// while ((USART1->SR & 0x40) == 0) { ; }
+	// USART1->DR = '\n';
+		// printf("AudioBuffer_Sync: \tab->capacity = %d, ab->size = %d, ab->wr_ptr = %d, ab->rd_ptr = %d, ab->state = %s\r\n",
+		// ab->capacity,
+		// ab->size,
+		// ab->wr_ptr,
+		// ab->rd_ptr,
+		// ab->state == AB_OK ? "AB_OK" : ab->state == AB_OVFL ? "AB_OVFL" : "AB_UDFL");
 }
 
+void AudioBuffer_Switch(I2S_HandleTypeDef* hi2s, AudioBuffer* ab)
+{
 
+
+
+}
 
 
 

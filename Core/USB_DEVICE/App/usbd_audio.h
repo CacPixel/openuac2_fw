@@ -128,7 +128,7 @@ extern "C" {
 #define INPUT_TERMINAL_ID															0x01
 #define INPUT_TERMINAL_TYPE														0x0101	// USB Streaming; See Termt20 section 2.1
 #define OUTPUT_TERMINAL_ID														0x03
-#define OUTPUT_TERMINAL_TYPE													0x0301	// Speaker; See Termt20 section 2.3
+#define OUTPUT_TERMINAL_TYPE													0x0302	// Headphone; See Termt20 section 2.3
 #define FEATURE_UNIT_ID																0x02
 
 // Endpoint definitions

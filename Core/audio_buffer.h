@@ -2,6 +2,7 @@
 #define _AUDIO_BUFFER_H_
 
 #include <stdint.h>
+#include "stm32f4xx.h"
 
 typedef enum
 {
@@ -20,13 +21,19 @@ typedef struct
 	uint8_t state;
 } AudioBuffer;
 
+extern AudioBuffer ab_instance;
+extern AudioBuffer ab_empty;
+
 //public:
 AudioBuffer* AudioBuffer_Instance();
-uint8_t AudioBuffer_GetState();
+void AudioBuffer_I2S_InitFirst(void);
+void I2S_DMA_MultiBufferStart(I2S_HandleTypeDef* hi2s, AudioBuffer* ab);
 void AudioBuffer_Init(AudioBuffer* ab, uint32_t);
+void AudioBuffer_Init_WithBuf(AudioBuffer* ab, uint32_t capacity, void* buf);
 void AudioBuffer_Reset(AudioBuffer* ab, uint32_t);
 void AudioBuffer_Recieve(AudioBuffer* ab, uint32_t);
 void AudioBuffer_Sync(AudioBuffer* ab, uint32_t);
+void AudioBuffer_Switch(I2S_HandleTypeDef* hi2s, AudioBuffer* ab);
 
 #define AudioBuffer_WrPtr(ab) (&(ab)->mem[(ab)->wr_ptr])
 

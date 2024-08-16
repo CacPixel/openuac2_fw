@@ -2,3 +2,13 @@ Debug/
 Release/
 *.launch
 devlog.md
+*.d
+*.o
+*.lnp
+*.map
+*.hex
+*.axf
+*.bin
+*.dep
+*.htm
+*.iex

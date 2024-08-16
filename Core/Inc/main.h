@@ -41,6 +41,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "sys.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -62,7 +63,7 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void printf1(const char* format, ...);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -76,6 +77,7 @@ void Error_Handler(void);
 #define LED3_GPIO_Port GPIOC
 #define DSDOE_Pin LL_GPIO_PIN_11
 #define DSDOE_GPIO_Port GPIOC
+
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

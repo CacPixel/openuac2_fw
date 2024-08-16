@@ -22,7 +22,10 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "usb_device.h"
+#include "usbd_audio_if.h"
 #include "ak4490r.h"
+#include "stdarg.h"
+#include "audio_buffer.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,22 +39,28 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define AT24C02_ADDR    0xA0
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
- I2C_HandleTypeDef hi2c1;
+I2C_HandleTypeDef hi2c1;
 
 I2S_HandleTypeDef hi2s1;
 I2S_HandleTypeDef hi2s3;
 DMA_HandleTypeDef hdma_spi1_tx;
 DMA_HandleTypeDef hdma_spi3_tx;
 
+SPI_HandleTypeDef hspi2;
+
+UART_HandleTypeDef huart1;
+
 PCD_HandleTypeDef hpcd_USB_OTG_HS;
 
 DMA_HandleTypeDef hdma_memtomem_dma2_stream0;
 DMA_HandleTypeDef hdma_memtomem_dma2_stream1;
 /* USER CODE BEGIN PV */
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -64,12 +73,41 @@ static void MX_I2S1_Init(void);
 static void MX_I2S3_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USB_OTG_HS_PCD_Init(void);
+static void MX_SPI2_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+extern AUDIO_CodecTypeDef ak4490r_instance;
+
+
+void printf1(const char* format, ...) {
+    uint8_t txbuff[128];
+    va_list listdata;
+    va_start(listdata, format);
+    vsprintf((char*)txbuff, format, listdata);
+    va_end(listdata);
+    HAL_UART_Transmit(&huart1, txbuff, strlen((char*)txbuff), strlen((char*)txbuff));
+}
+
+
+void PVD_Init(void)
+{
+    PWR_PVDTypeDef PvdStruct;
+
+    HAL_PWR_EnablePVD();
+
+    PvdStruct.PVDLevel = PWR_PVDLEVEL_6;
+    PvdStruct.Mode = PWR_PVD_MODE_IT_RISING;
+    HAL_PWR_ConfigPVD(&PvdStruct);
+
+    HAL_NVIC_SetPriority(PVD_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(PVD_IRQn);
+}
 
 /* USER CODE END 0 */
 
@@ -107,23 +145,49 @@ int main(void)
   MX_I2S3_Init();
   MX_TIM3_Init();
   MX_USB_OTG_HS_PCD_Init();
+  MX_SPI2_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  MX_USB_DEVICE_Init();
+          // for (int i = 0; i < 256; i++) {
+          //     u8 data = i;
+          //     HAL_I2C_Mem_Write(&hi2c1, AT24C02_ADDR + 1, data, I2C_MEMADD_SIZE_8BIT, &data, sizeof(u8), 1000);
+          //     HAL_Delay(2);
+          // }
 
-  // For LRCK counting for feedback
-  LL_TIM_EnableIT_UPDATE(TIM3);
-  LL_TIM_EnableCounter(TIM3);
+          // for (int i = 0; i < 256; i++) {
+          //     static u8 data;
+          //     HAL_I2C_Mem_Read(&hi2c1, AT24C02_ADDR, i, I2C_MEMADD_SIZE_8BIT, &data, sizeof(u8), 1000);
+          //     printf1("addr=%#x, data=%#x\r\n", i, data);
+          //     HAL_Delay(2);
+          // }
+    PVD_Init();
+    ak4490r_instance.Init();
+    
+    LL_GPIO_ResetOutputPin(PDN_GPIO_Port, PDN_Pin);
+    LL_mDelay(50);
+    LL_GPIO_SetOutputPin(PDN_GPIO_Port, PDN_Pin);
+    LL_mDelay(50);
+
+    MX_USB_DEVICE_Init();
+    LL_GPIO_ResetOutputPin(LED1_GPIO_Port, LED1_Pin);
+
+    // For LRCK counting for feedback
+    LL_TIM_EnableIT_UPDATE(TIM3);
+    LL_TIM_EnableCounter(TIM3);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-  	AK4490R_ProcessEvents();
+    while (1)
+    {
+        AK4490R_ProcessEvents();
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+    }
   /* USER CODE END 3 */
 }
 
@@ -149,13 +213,15 @@ void SystemClock_Config(void)
   }
   LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE, LL_RCC_PLLM_DIV_16, 250, LL_RCC_PLLP_DIV_4);
   LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSE, LL_RCC_PLLM_DIV_16, 250, LL_RCC_PLLR_DIV_2);
-  RCC->PLLCFGR |= 1 << 16;
   LL_RCC_PLL_Enable();
 
    /* Wait till PLL is ready */
   while(LL_RCC_PLL_IsReady() != 1)
   {
 
+  }
+  while (LL_PWR_IsActiveFlag_VOS() == 0)
+  {
   }
   LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_1);
   LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_4);
@@ -211,7 +277,7 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
+  hi2c1.Init.ClockSpeed = 400000;
   hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
@@ -298,6 +364,44 @@ static void MX_I2S3_Init(void)
 }
 
 /**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+
+  /* USER CODE BEGIN SPI2_Init 0 */
+
+  /* USER CODE END SPI2_Init 0 */
+
+  /* USER CODE BEGIN SPI2_Init 1 */
+
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
+
+  /* USER CODE END SPI2_Init 2 */
+
+}
+
+/**
   * @brief TIM3 Initialization Function
   * @param None
   * @retval None
@@ -329,7 +433,7 @@ static void MX_TIM3_Init(void)
   LL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
   /* TIM3 interrupt Init */
-  NVIC_SetPriority(TIM3_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),0, 0));
+  NVIC_SetPriority(TIM3_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),6, 0));
   NVIC_EnableIRQ(TIM3_IRQn);
 
   /* USER CODE BEGIN TIM3_Init 1 */
@@ -352,6 +456,39 @@ static void MX_TIM3_Init(void)
   /* USER CODE BEGIN TIM3_Init 2 */
 
   /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 1000000;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
 
 }
 
@@ -386,9 +523,9 @@ static void MX_USB_OTG_HS_PCD_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USB_OTG_HS_Init 2 */
-  HAL_PCDEx_SetRxFiFo(&hpcd_USB_OTG_HS, 0x200);
-  HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS, 0, 0x80);
-  HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS, 1, 0x174);
+    HAL_PCDEx_SetRxFiFo(&hpcd_USB_OTG_HS, 0x200);
+    HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS, 0, 0x80);
+    HAL_PCDEx_SetTxFiFo(&hpcd_USB_OTG_HS, 1, 0x174);
   /* USER CODE END USB_OTG_HS_Init 2 */
 
 }
@@ -446,13 +583,13 @@ static void MX_DMA_Init(void)
 
   /* DMA interrupt init */
   /* DMA1_Stream5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
   /* DMA2_Stream0_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
   /* DMA2_Stream3_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 6, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
 
 }
@@ -465,6 +602,8 @@ static void MX_DMA_Init(void)
 static void MX_GPIO_Init(void)
 {
   LL_GPIO_InitTypeDef GPIO_InitStruct = {0};
+/* USER CODE BEGIN MX_GPIO_Init_1 */
+/* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOH);
@@ -474,7 +613,10 @@ static void MX_GPIO_Init(void)
   LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOD);
 
   /**/
-  LL_GPIO_SetOutputPin(PDN_GPIO_Port, PDN_Pin);
+  LL_GPIO_ResetOutputPin(PDN_GPIO_Port, PDN_Pin);
+
+  /**/
+  LL_GPIO_ResetOutputPin(DSDOE_GPIO_Port, DSDOE_Pin);
 
   /**/
   LL_GPIO_SetOutputPin(GPIOB, LED1_Pin|LED2_Pin);
@@ -483,14 +625,11 @@ static void MX_GPIO_Init(void)
   LL_GPIO_SetOutputPin(LED3_GPIO_Port, LED3_Pin);
 
   /**/
-  LL_GPIO_ResetOutputPin(DSDOE_GPIO_Port, DSDOE_Pin);
-
-  /**/
   GPIO_InitStruct.Pin = PDN_Pin;
   GPIO_InitStruct.Mode = LL_GPIO_MODE_OUTPUT;
-  GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Speed = LL_GPIO_SPEED_FREQ_HIGH;
   GPIO_InitStruct.OutputType = LL_GPIO_OUTPUT_PUSHPULL;
-  GPIO_InitStruct.Pull = LL_GPIO_PULL_NO;
+  GPIO_InitStruct.Pull = LL_GPIO_PULL_DOWN;
   LL_GPIO_Init(PDN_GPIO_Port, &GPIO_InitStruct);
 
   /**/
@@ -527,6 +666,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = LL_GPIO_AF_0;
   LL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+/* USER CODE BEGIN MX_GPIO_Init_2 */
+/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
@@ -539,12 +680,12 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  NVIC_SystemReset();
-  while (1)
-  {
-  }
+          /* User can add his own implementation to report the HAL error return state */
+        //   __disable_irq();
+        //   NVIC_SystemReset();
+    while (1)
+    {
+    }
   /* USER CODE END Error_Handler_Debug */
 }
 
@@ -559,8 +700,8 @@ void Error_Handler(void)
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+          /* User can add his own implementation to report the file name and line number,
+             ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */

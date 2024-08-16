@@ -26,7 +26,7 @@ static void AUDIO_REQ_SetCurrent(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 static void AUDIO_REQ_GetRange(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
 static void *USBD_AUDIO_GetAudioHeaderDesc(uint8_t *pConfDesc);
 
-static USBD_AUDIO_HandleTypeDef s_haudio;
+USBD_AUDIO_HandleTypeDef s_haudio;
 
 USBD_ClassTypeDef USBD_AUDIO =
 {
@@ -383,9 +383,10 @@ void USBD_AUDIO_Sync(USBD_HandleTypeDef *pdev)
   // If the buffer is empty, stop playing
   if ((haudio->aud_buf->state == AB_UDFL) && (haudio->state == AUDIO_STATE_PLAYING))
 	{
+        haudio->state = AUDIO_STATE_STOPPED;
 		itf->AudioCmd(NULL, 0, AUDIO_CMD_STOP);
+        haudio->aud_buf->wr_ptr = haudio->aud_buf->rd_ptr = 0;
 		//haudio->stream_type = AUDIO_FORMAT_PCM;
-		haudio->state = AUDIO_STATE_STOPPED;
 	}
 
   if (haudio->aud_buf->state == AB_UDFL)

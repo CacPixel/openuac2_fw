@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "main.h": "c",
+        "ak4490r.h": "c",
+        "stdint.h": "c",
+        "usbd_audio_if.h": "c",
+        "audio_buffer.h": "c",
+        "usbd_audio.h": "c",
+        "stm32f4xx.h": "c"
+    }
+}
