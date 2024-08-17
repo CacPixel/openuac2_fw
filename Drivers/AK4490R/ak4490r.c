@@ -122,7 +122,7 @@ void AK4490R_ProcessEvents()
 //        printf1("reg[%d] = %#x\r\n", i, ((uint8_t*)&reg)[i]);
 //    }
 //    printf1("------------------\r\n");
-//    LL_mDelay(10);
+//    HAL_Delay(10);
     if (reset)
     {
         AK4490R_Reset();
@@ -151,7 +151,7 @@ void AK4490R_Reset(void)
     reg.control1 &= ~AK4490R_RSTN;
     HAL_I2C_Mem_Write_IT(&AK4490R_I2C_HANDLE, AK4490R_I2C_DEV_ADDR, AK4490R_CONTROL1_ADDR, I2C_MEMADD_SIZE_8BIT, (uint8_t*)&reg.control1, 1);
     while (AK4490R_I2C_HANDLE.State != HAL_I2C_STATE_READY) {}
-    LL_mDelay(50);
+    HAL_Delay(50);
     reg.control1 |= AK4490R_RSTN;
     HAL_I2C_Mem_Write_IT(&AK4490R_I2C_HANDLE, AK4490R_I2C_DEV_ADDR, AK4490R_CONTROL1_ADDR, I2C_MEMADD_SIZE_8BIT, (uint8_t*)&reg.control1, 1);
 }

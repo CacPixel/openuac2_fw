@@ -13,7 +13,6 @@ extern DMA_HandleTypeDef DMA_FILL_HANDLE;
 #endif
 
 __attribute__((aligned(4))) static uint8_t s_AudBufMem[AUDIO_BUF_SIZE + 1024];
-uint8_t s_BufZeros[6400] = { 0 };
 
 AudioBuffer ab_instance;
 AudioBuffer ab_empty;
